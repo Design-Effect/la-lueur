@@ -1,0 +1,16 @@
+{
+  "name": "La Lueur — Enfants",
+  "short_name": "Lueur Enfants",
+  "description": "La Lueur en déplacement libre, pour les petits joueurs.",
+  "start_url": "./enfants.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#13243C",
+  "theme_color": "#13243C",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
