@@ -1,8 +1,8 @@
 // La Lueur — service worker : mise en cache pour le jeu hors-ligne
-const CACHE = 'la-lueur-v1';
+const CACHE = 'la-lueur-v4';
 const ASSETS = [
-  './', './index.html', './enfants.html',
-  './manifest.json', './manifest-enfants.json',
+  './', './index.html',
+  './manifest.json',
   './icon-192.png', './icon-512.png',
 ];
 self.addEventListener('install', (e) => {

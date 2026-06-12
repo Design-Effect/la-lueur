@@ -119,6 +119,24 @@
     margin-top:18px;font-size:15.5px;letter-spacing:.05em;line-height:1.5;
     color:rgba(232,213,163,.6);
   }
+  .modes{display:flex;flex-direction:column;gap:14px;margin-top:28px;width:min(280px,80vw)}
+  .modeBtn{
+    font-family:'Cormorant Garamond',Georgia,serif;
+    padding:13px 10px;background:rgba(26,45,69,.45);
+    border:1px solid var(--gold);border-radius:2px;cursor:pointer;
+    color:var(--gold-light);font-size:21px;letter-spacing:.24em;text-transform:uppercase;text-indent:.24em;
+    transition:background .25s, box-shadow .25s;
+  }
+  .modeBtn span{display:block;font-size:14.5px;letter-spacing:.03em;text-transform:none;text-indent:0;font-style:italic;color:var(--mist);margin-top:5px}
+  .modeBtn em{display:block;font-style:normal;font-size:13px;letter-spacing:.14em;color:rgba(232,213,163,.55);margin-top:5px;text-transform:none;text-indent:0}
+  .modeBtn:hover,.modeBtn:focus-visible{background:rgba(201,168,76,.12);box-shadow:0 0 22px rgba(201,168,76,.25);outline:none}
+  #toMenu{
+    margin-top:14px;padding:10px 32px;background:transparent;cursor:pointer;
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:15px;letter-spacing:.24em;text-transform:uppercase;text-indent:.24em;
+    color:var(--mist);border:1px solid rgba(143,163,189,.4);border-radius:2px;
+  }
+  #toMenu:hover,#toMenu:focus-visible{border-color:var(--mist);outline:none}
   .hint{
     margin-top:42px;font-size:15px;letter-spacing:.3em;text-transform:uppercase;
     color:var(--gold);animation:breathe 2.6s ease-in-out infinite;
@@ -191,9 +209,11 @@
   <h1>LA LUEUR</h1>
   <div class="rule"></div>
   <p class="tagline">Survis dans la nuit.<br>Frôle l'obscurité pour briller.</p>
-  <p class="ctrl">Frôler rapporte gros et te fait grandir —<br>appuie deux fois sur l’écran pour exploser</p>
-  <div class="hint">Touche l'écran pour commencer</div>
-  <div class="best" id="menuBest"></div>
+  <div class="modes">
+    <button class="modeBtn" id="playSurvie">Survie<span>Esquive l'obscurité — frôler rapporte gros</span><em id="bestSurvie"></em></button>
+    <button class="modeBtn" id="playArcade">Arcade<span>Brise les rochers — évite les braises</span><em id="bestArcade"></em></button>
+  </div>
+  <p class="ctrl">Appuie deux fois sur l'écran pour la nova ✦</p>
 </div>
 
 <!-- Écran de fin -->
@@ -203,6 +223,7 @@
   <div id="newBest">✦ Nouveau record ✦</div>
   <div id="overBest"></div>
   <button id="replay">Rejouer</button>
+  <button id="toMenu">Menu</button>
 </div>
 
 <!-- Écran de pause -->
@@ -245,7 +266,12 @@ function resize(){
   canvas.width  = Math.floor(W * DPR);
   canvas.height = Math.floor(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  player.y = H * 0.8;
+  if (mode === 'arcade' && state === 'playing'){
+    player.y  = Math.min(H - 40, Math.max(H * 0.16, player.y  || H * 0.75));
+    player.ty = Math.min(H - 40, Math.max(H * 0.16, player.ty || H * 0.75));
+  } else {
+    player.y = player.ty = H * 0.8;
+  }
 }
 window.addEventListener('resize', resize);
 
@@ -255,7 +281,11 @@ const ui = {
   score:      document.getElementById('score'),
   combo:      document.getElementById('combo'),
   menu:       document.getElementById('menu'),
-  menuBest:   document.getElementById('menuBest'),
+  playSurvie: document.getElementById('playSurvie'),
+  playArcade: document.getElementById('playArcade'),
+  bestSurvie: document.getElementById('bestSurvie'),
+  bestArcade: document.getElementById('bestArcade'),
+  toMenu:     document.getElementById('toMenu'),
   over:       document.getElementById('over'),
   finalScore: document.getElementById('finalScore'),
   newBest:    document.getElementById('newBest'),
@@ -268,27 +298,32 @@ const ui = {
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// ---------- Persistance du record ----------
+// ---------- Persistance des records (un par mode) ----------
 // window.storage (artifact Claude) → localStorage (GitHub Pages) → mémoire
-let best = 0;
-async function loadBest(){
+let best = { survie: 0, arcade: 0 };
+async function loadKey(key){
   try{
     if (window.storage){
-      const r = await window.storage.get('lueur-best');
+      const r = await window.storage.get(key);
       if (r && r.value) return parseInt(r.value, 10) || 0;
     }
   }catch(e){}
   try{
     if (typeof localStorage !== 'undefined'){
-      const v = localStorage.getItem('lueur-best');
+      const v = localStorage.getItem(key);
       if (v) return parseInt(v, 10) || 0;
     }
   }catch(e){}
   return 0;
 }
-async function saveBest(v){
-  try{ if (window.storage){ await window.storage.set('lueur-best', String(v)); return; } }catch(e){}
-  try{ if (typeof localStorage !== 'undefined') localStorage.setItem('lueur-best', String(v)); }catch(e){}
+async function saveBest(){
+  const key = 'lueur-best-' + mode, v = String(best[mode]);
+  try{ if (window.storage){ await window.storage.set(key, v); return; } }catch(e){}
+  try{ if (typeof localStorage !== 'undefined') localStorage.setItem(key, v); }catch(e){}
+}
+function refreshMenuBests(){
+  ui.bestSurvie.textContent = best.survie > 0 ? 'Record · ' + best.survie : '';
+  ui.bestArcade.textContent = best.arcade > 0 ? 'Record · ' + best.arcade : '';
 }
 
 // ---------- Audio (Web Audio, sons synthétisés) ----------
@@ -502,7 +537,8 @@ ui.mute.addEventListener('click', (e) => {
 });
 
 // ---------- État du jeu ----------
-let state = 'menu';            // menu | playing | dying | over
+let state = 'menu';            // menu | playing | dying | over | paused
+let mode = 'survie';           // survie (esquive) | arcade (briser les rochers)
 let score = 0, displayedScore = -1;
 let combo = 0, comboTimer = 0;
 let elapsed = 0;               // temps de jeu (s)
@@ -516,8 +552,9 @@ let safeX = 0, safeDir = 1;      // couloir sûr : garantie qu'un passage existe
 let fuse = 0, zapTimer = 0;      // surcharge : compte à rebours avant détonation
 let trail = [];
 
-const player = { x: 0, y: 0, tx: 0, r: 13, size: 1, reb: 1, pulse: 0, grazeGlow: 0 };
+const player = { x: 0, y: 0, tx: 0, ty: 0, r: 13, size: 1, reb: 1, pulse: 0, grazeGlow: 0 };
 let obstacles = [], particles = [], rings = [], texts = [], stars = [];
+let flames = [];
 let flash = 0;
 const keys = {};
 
@@ -540,14 +577,18 @@ function makeStars(){
 // Départ lent. Monte doucement avec le temps, et surtout avec les frôlements :
 // plus tu joues avec le feu, plus le feu se rapproche.
 function speedFactor(){
+  if (mode === 'arcade')
+    return 1 + Math.min(elapsed * 0.009, 0.7) + Math.min(grazeCount * 0.02, 0.9);
   return 1 + Math.min(elapsed * 0.011, 0.9) + Math.min(grazeCount * 0.028, 1.1);
 }
 
 // ---------- Obstacles : éclats d'obscurité ----------
 function spawnObstacle(){
   const size = 15 + Math.random() * 30;
-  // 35 % des éclats visent la zone du joueur pour forcer le mouvement
-  const aimed = Math.random() < 0.35;
+  // braise rouge (arcade) : LE danger — probabilité qui monte avec le temps
+  const burning = mode === 'arcade' && elapsed > 8 && Math.random() < Math.min(0.05 + elapsed * 0.0012, 0.18);
+  // 35 % des éclats visent la zone du joueur (jamais les braises : équité)
+  const aimed = !burning && Math.random() < 0.35;
   let x = aimed
     ? Math.min(W - size, Math.max(size, player.x + (Math.random() - 0.5) * 160))
     : size + Math.random() * (W - size * 2);
@@ -577,6 +618,9 @@ function spawnObstacle(){
     nvMin = 6; nvMax = 7; rMin = 0.65; elong = 1.4;
     fill = '#0D1830'; stroke = 'rgba(168,158,224,0.6)';
   }
+  if (burning){
+    fill = '#3A0E08'; stroke = 'rgba(255,120,60,0.95)';
+  }
   const verts = [];
   const nv = nvMin + Math.floor(Math.random() * (nvMax - nvMin + 1));
   for (let i = 0; i < nv; i++){
@@ -595,6 +639,8 @@ function spawnObstacle(){
     rot: Math.random() * Math.PI * 2,
     vr: (Math.random() - 0.5) * 1.6,
     grazed: false,
+    burning,
+    flick: Math.random() * 6,
   });
 }
 
@@ -678,13 +724,15 @@ function addText(x, y, str, big){
 }
 
 // ---------- Déroulement ----------
-function startGame(){
-  obstacles = []; particles = []; rings = []; texts = [];
+function startGame(m){
+  if (m) mode = m;
+  obstacles = []; particles = []; rings = []; texts = []; flames = [];
   flash = 0;
   score = 0; displayedScore = -1; combo = 0; comboTimer = 0;
   elapsed = 0; spawnTimer = 0.6; shake = 0; grazeCount = 0;
   player.x = player.tx = W / 2;
-  player.y = H * 0.8;
+  if (mode === 'arcade'){ player.y = player.ty = H * 0.75; }
+  else { player.y = player.ty = H * 0.8; }
   player.size = 1;
   player.reb = 1;
   novaReadyShown = false;
@@ -722,28 +770,29 @@ async function endGame(){
   state = 'over';
   const final = Math.floor(score);
   ui.finalScore.textContent = final;
-  if (final > best){
-    best = final;
+  if (final > best[mode]){
+    best[mode] = final;
     ui.newBest.classList.add('show');
-    ui.overBest.textContent = 'Record · ' + best;
-    await saveBest(best);
+    ui.overBest.textContent = 'Record · ' + best[mode];
+    await saveBest();
   } else {
     ui.newBest.classList.remove('show');
-    const diff = best - final;
-    ui.overBest.textContent = (best > 0 && diff > 0)
-      ? 'Record · ' + best + '  ·  à ' + diff + ' points'
-      : 'Record · ' + best;
+    const diff = best[mode] - final;
+    ui.overBest.textContent = (best[mode] > 0 && diff > 0)
+      ? 'Record · ' + best[mode] + '  ·  à ' + diff + ' points'
+      : 'Record · ' + best[mode];
   }
   ui.over.classList.remove('hidden');
 }
 
 // ---------- Entrées ----------
-let dragging = false, lastPX = 0;
+let dragging = false, lastPX = 0, lastPY = 0;
 function dragMove(e){
   if (state !== 'playing' || !dragging) return;
   // contrôle relatif : l'orbe suit le MOUVEMENT du doigt maintenu, pas sa position
   player.tx += e.clientX - lastPX;
-  lastPX = e.clientX;
+  if (mode === 'arcade') player.ty += e.clientY - lastPY;
+  lastPX = e.clientX; lastPY = e.clientY;
 }
 const activePointers = new Set();
 let primaryId = null, lastTap = 0;
@@ -757,7 +806,7 @@ window.addEventListener('pointerdown', (e) => {
   if (e.target.closest('button')) return;
   initAudio();
   if (state === 'menu'){
-    startGame();
+    // le choix du mode se fait par les boutons
   } else if (state === 'paused'){
     ui.pause.classList.add('hidden');
     state = 'playing';
@@ -770,7 +819,7 @@ window.addEventListener('pointerdown', (e) => {
       lastTap = now;
       primaryId = e.pointerId;
       dragging = true;
-      lastPX = e.clientX;
+      lastPX = e.clientX; lastPY = e.clientY;
     } else {
       // deuxième doigt pendant la glisse : déclenche aussi la nova
       tryBurst();
@@ -786,6 +835,15 @@ function releasePointer(e){
 window.addEventListener('pointerup', releasePointer);
 window.addEventListener('pointercancel', releasePointer);
 ui.replay.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
+ui.playSurvie.addEventListener('click', (e) => { e.stopPropagation(); initAudio(); startGame('survie'); });
+ui.playArcade.addEventListener('click', (e) => { e.stopPropagation(); initAudio(); startGame('arcade'); });
+ui.toMenu.addEventListener('click', (e) => {
+  e.stopPropagation();
+  ui.over.classList.add('hidden');
+  ui.menu.classList.remove('hidden');
+  refreshMenuBests();
+  state = 'menu';
+});
 ui.burst.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -835,7 +893,7 @@ function update(dt){
     if (Math.random() < dt * 0.12) safeDir *= -1;
 
     // record battu en direct
-    if (!recordBeaten && best > 0 && score > best){
+    if (!recordBeaten && best[mode] > 0 && score > best[mode]){
       recordBeaten = true;
       addText(player.x, player.y - 72, 'RECORD !', true);
       flash = Math.max(flash, 0.3);
@@ -877,10 +935,16 @@ function update(dt){
     // clavier
     if (keys['ArrowLeft'])  player.tx -= 460 * dt;
     if (keys['ArrowRight']) player.tx += 460 * dt;
+    if (mode === 'arcade'){
+      if (keys['ArrowUp'])   player.ty -= 460 * dt;
+      if (keys['ArrowDown']) player.ty += 460 * dt;
+      player.ty = Math.min(H - 40, Math.max(H * 0.16, player.ty));
+    }
     player.tx = Math.min(W - player.r, Math.max(player.r, player.tx));
 
     // déplacement fluide de l'orbe
     player.x += (player.tx - player.x) * Math.min(1, dt * 16);
+    if (mode === 'arcade') player.y += (player.ty - player.y) * Math.min(1, dt * 16);
     player.pulse += dt * 3;
     player.grazeGlow = Math.max(0, player.grazeGlow - dt * 2.2);
     player.reb = Math.min(1, player.reb + dt * 1.6);
@@ -899,7 +963,9 @@ function update(dt){
     spawnTimer -= dt;
     if (spawnTimer <= 0){
       spawnObstacle();
-      const interval = Math.max(0.24, 0.95 - elapsed * 0.006 - grazeCount * 0.01);
+      const interval = mode === 'arcade'
+        ? Math.max(0.28, 0.95 - elapsed * 0.005 - grazeCount * 0.007)
+        : Math.max(0.24, 0.95 - elapsed * 0.006 - grazeCount * 0.01);
       spawnTimer = interval * (0.7 + Math.random() * 0.6);
     }
 
@@ -909,6 +975,26 @@ function update(dt){
       o.x += o.vx * dt;
       o.y += o.vy * dt;
       o.rot += o.vr * dt;
+      if (o.burning){
+        o.flick += dt * 7;
+        // émission continue de flammes : le feu monte pendant que le roc tombe → météore
+        if (!reducedMotion){
+          const n = Math.ceil(dt * 55);
+          for (let k = 0; k < n; k++){
+            const a = Math.random() * Math.PI * 2;
+            const rr = o.r * (0.5 + Math.random() * 0.5);
+            flames.push({
+              x: o.x + Math.cos(a) * rr,
+              y: o.y + Math.sin(a) * rr * 0.6,
+              vx: o.vx * 0.4 + (Math.random() - 0.5) * 50,
+              vy: -40 - Math.random() * 90,
+              r: (2.2 + Math.random() * 3) * (o.r / 22),
+              life: 1,
+              decay: 1.5 + Math.random() * 0.9,
+            });
+          }
+        }
+      }
 
       if (o.y > H + o.r * 2){
         // rocher esquivé : petits points, multipliés par la taille de l'orbe
@@ -921,35 +1007,68 @@ function update(dt){
       const dx = o.x - player.x, dy = o.y - player.y;
       const dist = Math.hypot(dx, dy);
 
-      // collision (légèrement indulgente : ça paraît juste)
-      if (dist < pr + o.r * 0.78){
-        die();
-        return;
-      }
-      // frôlement
-      if (!o.grazed && dist < pr + o.r + GRAZE_MARGIN){
-        o.grazed = true;
-        combo++;
-        grazeCount++;
-        player.size = Math.min(SIZE_MAX, player.size + SIZE_PER_GRAZE);
-        if (player.size >= SIZE_CRITICAL && fuse <= 0){
-          fuse = 2.5 + Math.random() * 2;     // la détonation approche…
-          addText(player.x, player.y - 52, 'surcharge !', true);
+      if (mode === 'arcade'){
+        // braise rouge : ses flammes brûlent — zone mortelle PLUS LARGE que la zone de casse
+        if (o.burning && dist < pr + o.r * 1.05){
+          die();
+          return;
         }
-        comboTimer = COMBO_WINDOW;
-        const sizeBonus = Math.round((player.size - 1) * 125);  // jusqu'à +250 en pleine surcharge
-        const bonus = GRAZE_BONUS * combo + sizeBonus;
-        score += bonus;
-        player.grazeGlow = 1;
-        addRing(player.x, player.y);
-        addText(o.x, o.y, '+' + bonus, sizeBonus >= 60);
-        if (!novaReadyShown && player.size >= MIN_BURST){
-          novaReadyShown = true;
-          addText(player.x, player.y - 52, 'nova prête !', true);
+        // BOUM : toucher un rocher normal le brise — c'est le but du jeu !
+        if (!o.burning && dist < pr + o.r * 0.85){
+          combo++;
+          grazeCount++;
+          player.size = Math.min(SIZE_MAX, player.size + SIZE_PER_GRAZE);
+          if (player.size >= SIZE_CRITICAL && fuse <= 0){
+            fuse = 2.5 + Math.random() * 2;
+            addText(player.x, player.y - 52, 'surcharge !', true);
+          }
+          comboTimer = COMBO_WINDOW;
+          const bonus = Math.round(10 * player.size) + GRAZE_BONUS * Math.min(combo, 6);
+          score += bonus;
+          player.grazeGlow = 1;
+          addRing(o.x, o.y);
+          addText(o.x, o.y, '+' + bonus, player.size >= 1.8);
+          if (!novaReadyShown && player.size >= MIN_BURST){
+            novaReadyShown = true;
+            addText(player.x, player.y - 52, 'nova prête !', true);
+          }
+          burst(o.x, o.y, reducedMotion ? 4 : 10, 190);
+          playGraze(combo);
+          buzz(15);
+          obstacles.splice(i, 1);
+          continue;
         }
-        if (!reducedMotion) burst((o.x + player.x) / 2, (o.y + player.y) / 2, 6, 120);
-        playGraze(combo);
-        buzz(12);
+      } else {
+        // collision (légèrement indulgente : ça paraît juste)
+        if (dist < pr + o.r * 0.78){
+          die();
+          return;
+        }
+        // frôlement
+        if (!o.grazed && dist < pr + o.r + GRAZE_MARGIN){
+          o.grazed = true;
+          combo++;
+          grazeCount++;
+          player.size = Math.min(SIZE_MAX, player.size + SIZE_PER_GRAZE);
+          if (player.size >= SIZE_CRITICAL && fuse <= 0){
+            fuse = 2.5 + Math.random() * 2;     // la détonation approche…
+            addText(player.x, player.y - 52, 'surcharge !', true);
+          }
+          comboTimer = COMBO_WINDOW;
+          const sizeBonus = Math.round((player.size - 1) * 125);  // jusqu'à +250 en pleine surcharge
+          const bonus = GRAZE_BONUS * combo + sizeBonus;
+          score += bonus;
+          player.grazeGlow = 1;
+          addRing(player.x, player.y);
+          addText(o.x, o.y, '+' + bonus, sizeBonus >= 60);
+          if (!novaReadyShown && player.size >= MIN_BURST){
+            novaReadyShown = true;
+            addText(player.x, player.y - 52, 'nova prête !', true);
+          }
+          if (!reducedMotion) burst((o.x + player.x) / 2, (o.y + player.y) / 2, 6, 120);
+          playGraze(combo);
+          buzz(12);
+        }
       }
     }
   }
@@ -968,6 +1087,15 @@ function update(dt){
     p.vy += 160 * dt;
     p.life -= p.decay * dt;
     if (p.life <= 0) particles.splice(i, 1);
+  }
+  // flammes : montée (le feu monte toujours), vacillement, extinction
+  for (let i = flames.length - 1; i >= 0; i--){
+    const f = flames[i];
+    f.vy -= 70 * dt;
+    f.vx += (Math.random() - 0.5) * 140 * dt;
+    f.x += f.vx * dt; f.y += f.vy * dt;
+    f.life -= f.decay * dt;
+    if (f.life <= 0) flames.splice(i, 1);
   }
   // anneaux
   for (let i = rings.length - 1; i >= 0; i--){
@@ -989,7 +1117,7 @@ function update(dt){
   const s = Math.floor(score);
   if (s !== displayedScore){ displayedScore = s; ui.score.textContent = s; }
   if (combo >= 2 && state === 'playing'){
-    ui.combo.textContent = '×' + combo + ' frôlés';
+    ui.combo.textContent = '×' + combo + (mode === 'arcade' ? ' brisés' : ' frôlés');
     ui.combo.classList.add('on');
   } else {
     ui.combo.classList.remove('on');
@@ -1022,6 +1150,13 @@ function draw(){
   for (const o of obstacles){
     ctx.save();
     ctx.translate(o.x, o.y);
+    if (o.burning){
+      const fg = ctx.createRadialGradient(0, 0, 0, 0, 0, o.r * 1.8);
+      fg.addColorStop(0, 'rgba(255,110,40,' + (0.35 + Math.sin(o.flick) * 0.12).toFixed(2) + ')');
+      fg.addColorStop(1, 'rgba(255,60,20,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.arc(0, 0, o.r * 1.8, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.rotate(o.rot);
     ctx.beginPath();
     ctx.moveTo(o.verts[0].x, o.verts[0].y);
@@ -1033,6 +1168,23 @@ function draw(){
     ctx.strokeStyle = o.grazed ? 'rgba(201,168,76,0.85)' : o.stroke;
     ctx.stroke();
     ctx.restore();
+  }
+
+  // flammes des braises : rendu additif — la lumière s'accumule comme un vrai feu
+  if (flames.length){
+    ctx.globalCompositeOperation = 'lighter';
+    for (const f of flames){
+      const l = Math.max(0, f.life);
+      let col;
+      if (l > 0.66)      col = '255,236,170';
+      else if (l > 0.33) col = '255,140,45';
+      else               col = '185,55,18';
+      ctx.fillStyle = 'rgba(' + col + ',' + (l * 0.45).toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r * (0.5 + l * 0.9), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   // anneaux dorés (frôlements)
@@ -1161,8 +1313,9 @@ function loop(now){
   resize();
   makeStars();
   player.x = player.tx = W / 2;
-  best = await loadBest();
-  ui.menuBest.textContent = best > 0 ? 'Record · ' + best : '';
+  best.survie = (await loadKey('lueur-best-survie')) || (await loadKey('lueur-best'));
+  best.arcade = await loadKey('lueur-best-arcade');
+  refreshMenuBests();
   requestAnimationFrame(loop);
 })();
 window.addEventListener('resize', makeStars);
