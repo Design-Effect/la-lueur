@@ -130,6 +130,18 @@
   .modeBtn span{display:block;font-size:14.5px;letter-spacing:.03em;text-transform:none;text-indent:0;font-style:italic;color:var(--mist);margin-top:5px}
   .modeBtn em{display:block;font-style:normal;font-size:13px;letter-spacing:.14em;color:rgba(232,213,163,.55);margin-top:5px;text-transform:none;text-indent:0}
   .modeBtn:hover,.modeBtn:focus-visible{background:rgba(201,168,76,.12);box-shadow:0 0 22px rgba(201,168,76,.25);outline:none}
+  #share{
+    margin-top:22px;padding:13px 40px;
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:17px;letter-spacing:.2em;text-transform:uppercase;text-indent:.2em;
+    color:#13243C;background:var(--gold);cursor:pointer;
+    border:none;border-radius:2px;
+    box-shadow:0 0 22px rgba(201,168,76,.35);
+    transition:box-shadow .25s, transform .15s;
+  }
+  #share:hover,#share:focus-visible{box-shadow:0 0 32px rgba(201,168,76,.6);outline:none}
+  #share:active{transform:scale(.97)}
+  #share.copied{background:var(--mist);color:#13243C}
   #toMenu{
     margin-top:14px;padding:10px 32px;background:transparent;cursor:pointer;
     font-family:'Cormorant Garamond',Georgia,serif;
@@ -223,6 +235,7 @@
   <div id="newBest">✦ Nouveau record ✦</div>
   <div id="overBest"></div>
   <button id="replay">Rejouer</button>
+  <button id="share">✦ Partager mon score</button>
   <button id="toMenu">Menu</button>
 </div>
 
@@ -286,6 +299,7 @@ const ui = {
   bestSurvie: document.getElementById('bestSurvie'),
   bestArcade: document.getElementById('bestArcade'),
   toMenu:     document.getElementById('toMenu'),
+  share:      document.getElementById('share'),
   over:       document.getElementById('over'),
   finalScore: document.getElementById('finalScore'),
   newBest:    document.getElementById('newBest'),
@@ -837,6 +851,29 @@ window.addEventListener('pointercancel', releasePointer);
 ui.replay.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
 ui.playSurvie.addEventListener('click', (e) => { e.stopPropagation(); initAudio(); startGame('survie'); });
 ui.playArcade.addEventListener('click', (e) => { e.stopPropagation(); initAudio(); startGame('arcade'); });
+ui.share.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const final = Math.floor(score);
+  const modeName = mode === 'arcade' ? 'Arcade' : 'Survie';
+  const url = 'https://design-effect.github.io/la-lueur/';
+  const text = 'J\'ai marqué ' + final + ' points en mode ' + modeName + ' sur La Lueur ✦ Tu peux faire mieux ?';
+  try{
+    if (navigator.share){
+      await navigator.share({ title: 'La Lueur', text, url });
+      return;
+    }
+  }catch(err){ if (err && err.name === 'AbortError') return; }
+  // repli : copie dans le presse-papier
+  try{
+    await navigator.clipboard.writeText(text + ' ' + url);
+    ui.share.textContent = '✓ Copié !';
+    ui.share.classList.add('copied');
+    setTimeout(() => {
+      ui.share.textContent = '✦ Partager mon score';
+      ui.share.classList.remove('copied');
+    }, 1600);
+  }catch(err){}
+});
 ui.toMenu.addEventListener('click', (e) => {
   e.stopPropagation();
   ui.over.classList.add('hidden');
