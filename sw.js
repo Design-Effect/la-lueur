@@ -1,5 +1,5 @@
 // La Lueur — service worker : mise en cache pour le jeu hors-ligne
-const CACHE = 'la-lueur-v4';
+const CACHE = 'la-lueur-v5';
 const ASSETS = [
   './', './index.html',
   './manifest.json',
